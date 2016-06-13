@@ -3,7 +3,8 @@ This is a library for Adafruit SSD1351 displays (and others): https://www.adafru
 There are two versions of this display: 1.5" 128x128 and 1.27" 128x96.
 In theory this should work on both, but I only own the former, so that's the only one I've tried it on.
 
-** Description **
+**Description**
+
 This library is a hacked together modification of Paul Stoffregen's ILI9341_t3 library: https://github.com/PaulStoffregen/ILI9341_t3
 
 I've taken most of the low-level communication code and adapted it slightly to work with the SSD1351 display.
@@ -12,7 +13,8 @@ Apart from adapting it to the SSD1351 display, the majority of the work is in us
 
 On a non-overclocked teensy, using a 128x96 display and single buffering, it should achieve up to 75fps using 65k colours and 40fps using 262k colours. The real fps will be lower depending on computational work happening in addition to just pushing data to the display.
 
-Some example benchmarks:
+**Some example benchmarks:**
+
  - HighColor single buffered:
    - ~24ms to update the screen, doesn't change depending on what pixels changed (-> 41fps when no changes to content)
    - ~4ms to write to each pixel in the buffer (-> 35fps when updating every pixel)
@@ -30,7 +32,8 @@ Some example benchmarks:
 
 The library uses an optional display buffer for its drawing operations. When used, all operations write to a buffer, the display is only updated once display.update() is called. Updating the display takes about 24ms in 262k colour mode, 13ms in 65k colour mode. Because of the large overhead of addressing a single pixel in the display, this becomes faster than sending data straight to the display if more than about 1/4 of the pixels are directly accessed. The overhead of filling the entire buffer in a simple loop is about 4ms.
 
-** Wiring **
+**Wiring**
+
 The whole library only works when using hardware SPI. I have only tried it on spi0, and I haven't yet tried sharing the bus with
 another device, so don't expect that to work.
 
@@ -41,13 +44,13 @@ These are the pins I use (which are also the defaults for the constructors)
  - CS 10
  - RESET 14
 
-** Notes **
+**Notes**
 
  - readPixel and readRect aren't implemented yet. The display also doesn't support reading data over SPI, so this only works in buffered mode. It'll be super fast thanks to that though.
  - I've removed all of the font magic from the ILI9341_t3 library. I wanted to make this work first, I'm hoping to add text things back in later. Because of the buffering, many of the optimizations done for the fonts aren't really necessary anymore.
 
 The base library itself is based on Adafruit's Adafruit-GFX library: https://github.com/adafruit/Adafruit-GFX-Library
-----
+
 Adafruit invests time and resources providing this open source code,
 please support Adafruit and open-source hardware by purchasing
 products from Adafruit!
