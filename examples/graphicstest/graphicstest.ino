@@ -15,47 +15,28 @@
 
 
 #include "SPI.h"
-#include "ILI9341_t3.h"
+#include <ssd1351.h>
 
-// For the Adafruit shield, these are the default.
-#define TFT_DC  9
-#define TFT_CS 10
+// use this to do Color c = RGB(...) instead of `RGB c = RGB(...)` or ssd1351::LowColor c = RGB(...)
+// because it's slightly faster and guarantees you won't be sending wrong colours to the display.
+typedef ssd1351::HighColor Color;
 
-// Use hardware SPI (on Uno, #13, #12, #11) and the above for CS/DC
-ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC);
+auto display = ssd1351::SSD1351<Color, ssd1351::SingleBuffer, 128, 96>();
 
 void setup() {
   tft.begin();
-  tft.fillScreen(ILI9341_BLACK);
-  tft.setTextColor(ILI9341_YELLOW);
-  tft.setTextSize(2);
+  tft.fillScreen(ssd1351::RGB());
   tft.println("Waiting for Arduino Serial Monitor...");
 
   Serial.begin(9600);
   while (!Serial) ; // wait for Arduino Serial Monitor
-  Serial.println("ILI9341 Test!"); 
+  Serial.println("SSD1351 Test!");
 
-  // read diagnostics (optional but can help debug problems)
-  uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-  Serial.print("Display Power Mode: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDMADCTL);
-  Serial.print("MADCTL Mode: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDPIXFMT);
-  Serial.print("Pixel Format: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDIMGFMT);
-  Serial.print("Image Format: 0x"); Serial.println(x, HEX);
-  x = tft.readcommand8(ILI9341_RDSELFDIAG);
-  Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX); 
-  
   Serial.println(F("Benchmark                Time (microseconds)"));
 
   Serial.print(F("Screen fill              "));
   Serial.println(testFillScreen());
   delay(200);
-
-  Serial.print(F("Text                     "));
-  Serial.println(testText());
-  delay(600);
 
   Serial.print(F("Lines                    "));
   Serial.println(testLines(ILI9341_CYAN));
