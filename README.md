@@ -23,7 +23,7 @@ On a non-overclocked teensy, using a 128x96 display and single buffering, it sho
    - ~13ms to update the screen (-> 77fps)
    - ~3ms to write to each pixel in the buffer (-> 62.5fps)
    - ~1ms to fill buffer with a solid color (-> 71fps)
- - LowColor without buffering (this is copied almost 1:1 from the base library):
+ - HighColor without buffering (this is copied almost 1:1 from the base library):
    - ~98ms to manually write to every pixel to the screen (-> 10fps)
    - ~21ms to fill the screen with a solid color (->48fps)
  - LowColor without buffering (this is copied almost 1:1 from the base library):
