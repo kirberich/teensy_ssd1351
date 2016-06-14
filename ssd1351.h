@@ -306,21 +306,8 @@ public:
 
 	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
 	void drawFastVLine(int16_t x, int16_t y, int16_t h, const C &color) {
-		// Drawing a vertical line quicker on the buffer requires some math.
-		// The first pixel is at x + width * y, the second pixel is at x + width * (y + 1)
-		// We could just call drawPixel, but this way we can save on boundary checks.
-
-		if((x >= width) || (y >= height)) {
-			return;
-		}
-		if((y + h - 1) >= height) {
-			h = height - y;
-		}
-
-		for (uint16_t i = x + width * y; i < 200; i += width) {
-			frontBuffer[i] = color;
-		}
-
+		// Trying to optimize line drawing in buffered mode is pretty pointless, it's stupid fast anyway.
+		drawLine(x, y, x, y + h - 1, color);
 	}
 
 	void drawFastHLine(int16_t x, int16_t y, int16_t w, const C &color) {
