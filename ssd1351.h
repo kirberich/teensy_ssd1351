@@ -310,6 +310,7 @@ public:
 		drawLine(x, y, x, y + h - 1, color);
 	}
 
+  MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
 	void drawFastHLine(int16_t x, int16_t y, int16_t w, const C &color) {
 		// Rudimentary clipping
 		if((x >= W) || (y >= H)) {
@@ -328,6 +329,12 @@ public:
 		SPI.endTransaction();
 	}
 
+  MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
+	void drawFastHLine(int16_t x, int16_t y, int16_t w, const C &color) {
+		// Trying to optimize line drawing in buffered mode is pretty pointless, it's stupid fast anyway.
+		drawLine(x, y, x + w - 1, y, color);
+	}
+
 	void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
 		drawFastHLine(x, y, w, color);
 		drawFastHLine(x, y + h - 1, w, color);
@@ -335,7 +342,7 @@ public:
 		drawFastVLine(x + w - 1, y, h, color);
 	}
 
-
+  MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
 	void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
 		// rudimentary clipping (drawChar w/big text requires this)
 		if((x >= W) || (y >= H)) {
@@ -365,6 +372,35 @@ public:
 			}
 		}
 	}
+
+  MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
+	void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
+    if((x >= W) || (y >= H)) {
+			return;
+		}
+    if (x < 0) {
+      w -= abs(x);
+      x = 0;
+    }
+    if (y < 0) {
+      y -= abs(y);
+      y = 0;
+    }
+		if((x + w - 1) >= W) {
+
+			w = W - x;
+		}
+		if((y + h - 1) >= H) {
+			h = H - y;
+		}
+
+    ArrayType &buffer = frontBuffer();
+    for(int _y = y; _y < (y + h); _y++) {
+      for(int _x = x; _x < (x + w); _x++) {
+        buffer[_x + (W * _y)] = color;
+      }
+    }
+  }
 
 	void drawCircle(int16_t x0, int16_t y0, int16_t r, const C &color) {
 		int16_t f = 1 - r;
