@@ -19,14 +19,9 @@ struct RGB {
 	uint8_t g;
 	uint8_t b;
 
-	uint8_t clamp(int16_t val) {
-		if (val < 0) {
-			return 0;
-		}
-		if (val > 255) {
-			return 255;
-		}
-		return val;
+	uint8_t __attribute__((always_inline)) clamp(int16_t val) {
+		val = val > 255 ? 255 : val;
+		return val < 0 ? 0 : val;
 	}
 
 	RGB() {
