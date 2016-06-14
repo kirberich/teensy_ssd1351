@@ -839,8 +839,5 @@ private:
 	  waitTransmitComplete(mcr);
 	}
 };
-}
 
-// Read pixel data (only possible when using buffer)
-// uint16_t readPixel(int16_t x, int16_t y);
-// void readRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t *pcolors);
+}
