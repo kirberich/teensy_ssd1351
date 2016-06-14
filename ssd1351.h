@@ -29,7 +29,7 @@ extern "C"{
 }
 
 #ifndef swap
-template <typename T> void __attribute__((always_inline)) swap(T a, T b) {
+template <typename T> void __attribute__((always_inline)) swap(T &a, T &b) {
 	T t = a;
 	a = b;
 	b = t;
