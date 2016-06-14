@@ -58,7 +58,7 @@ struct RGB {
 	}
 
 	operator IndexedColor() const {
-		return (r & 0xE0) | (g >> 3) | (b >> 6);
+		return (r & 0xE0) | ((g & 0xE0) >> 3) | (b >> 6);
 	}
 };
 }
