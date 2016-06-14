@@ -90,7 +90,7 @@ public:
  	}
 
 	// Color depth for high color mode (3 bytes per pixel)
-	MEMBER_REQUIRES(std::is_same<C, HighColor>::value)
+	MEMBER_REQUIRES(std::is_same<C, HighColor>::value || std::is_same<C, IndexedColor>::value)
 	void setColorDepth() {
 		sendCommandAndContinue(CMD_REMAP);
 		sendDataAndContinue(0xB4);
@@ -187,6 +187,21 @@ public:
 		sendLastCommand(enable ? CMD_DISPLAY_SLEEP : CMD_DISPLAY_WAKE);
 		SPI.endTransaction();
 	}
+
+  // push color for indexed color mode
+  MEMBER_REQUIRES(std::is_same<C, IndexedColor>::value)
+  void pushColor(const C &color, bool lastCommand=false) {
+		// Send color in indexed color mode - the data gets sent as three bytes,
+		// only using the low 6 bits for the color (for 18bit color in total)
+
+		sendDataAndContinue((color & 0xE0) >> 2);
+		sendDataAndContinue((color & 0x7C) << 1);
+		if (lastCommand) {
+			sendLastData((color & 0x3) << 4);
+		} else {
+			sendDataAndContinue((color & 0x3) << 4);
+		}
+	};
 
 	// push color for Low color mode
 	MEMBER_REQUIRES(std::is_same<C, LowColor>::value)
