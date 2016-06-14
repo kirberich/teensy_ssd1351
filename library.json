@@ -1,7 +1,7 @@
 {
-  "name": "ILI9341_t3",
-  "keywords": "display, tft, lcd, graphics, spi",
-  "description": "Optimized ILI9341 (320x240 Color TFT) Display",
+  "name": "Teensy SSD1351",
+  "keywords": "display, oled, graphics, spi",
+  "description": "Optimized SSD1351 Display Library for Teensy",
   "authors": [
     {
         "name": "Limor Fried",
@@ -10,7 +10,13 @@
     {
         "name": "Paul Stoffregen",
         "email": "paul@pjrc.com",
-        "url": "http://www.pjrc.com",
+        "url": "http://www.pjrc.com"
+
+    },
+    {
+        "name": "Robert Kirberich",
+        "email": "robert@kirberich.de",
+        "url": "http://kirberich.uk",
         "maintainer": true
     }
   ],
@@ -21,7 +27,7 @@
   "repository":
   {
     "type": "git",
-    "url": "https://github.com/PaulStoffregen/ILI9341_t3.git"
+    "url": "https://github.com/kirberich/teensy_ssd1351.git"
   },
   "frameworks": "arduino",
   "platforms": "teensy"

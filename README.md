@@ -49,6 +49,13 @@ These are the pins I use (which are also the defaults for the constructors)
  - readPixel and readRect aren't implemented yet. The display also doesn't support reading data over SPI, so this only works in buffered mode. It'll be super fast thanks to that though.
  - I've removed all of the font magic from the ILI9341_t3 library. I wanted to make this work first, I'm hoping to add text things back in later. Because of the buffering, many of the optimizations done for the fonts aren't really necessary anymore.
 
+**Thanks**
+
+ - First thanks to Adafruit for building the original Adafruit-GFX library. Buy their stuff!
+ - Almost all credit goes to Paul Stoffregen (https://github.com/PaulStoffregen) for his original work on the optimized ILI9341_t3 library.
+ - Many thanks to Luke Benstead (https://github.com/kazade) for helping me with all the crazy C++ things.
+ - Special thanks to David Will (https://github.com/openhoon) for the original help with getting the display Running
+
 The base library itself is based on Adafruit's Adafruit-GFX library: https://github.com/adafruit/Adafruit-GFX-Library
 
 Adafruit invests time and resources providing this open source code,
