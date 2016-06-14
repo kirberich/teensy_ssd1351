@@ -5,7 +5,8 @@
 // use this to do Color c = RGB(...) instead of `RGB c = RGB(...)` or ssd1351::LowColor c = RGB(...)
 // because it's slightly faster and guarantees you won't be sending wrong colours to the display.
 
-// Choose color depth - LowColor and HighColor currently supported
+// Choose color depth - IndexedColor, LowColor and HighColor currently supported
+// typedef ssd1351::IndexedColor Color;
 // typedef ssd1351::LowColor Color;
 typedef ssd1351::HighColor Color;
 
