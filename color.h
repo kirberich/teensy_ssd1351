@@ -47,7 +47,7 @@ struct RGB {
 	}
 
 	operator HighColor() const {
-		return {r, g, b};
+		return HighColor(r, g, b);
 	}
 
 	operator LowColor() const {
