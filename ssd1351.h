@@ -17,7 +17,7 @@
 
 #pragma once
 #include <Arduino.h>
-#include <vector>
+#include <array>
 #include <SPI.h>
 #include "color.h"
 #include "buffer.h"
@@ -71,28 +71,16 @@ const auto black = RGB();
 
 static const SPISettings spi_settings(SPICLOCK, MSBFIRST, SPI_MODE0);
 
-template <typename C, typename B>
+template <typename C, typename B, int W = 128, int H = 128>
 class SSD1351 {
 public:
 	SSD1351(
-		uint8_t _width = 128,
-		uint8_t _height = 128,
 		uint8_t _cs = 10,
 		uint8_t _dc = 15,
 		uint8_t _reset = 14,
 		uint8_t _mosi=11,
 		uint8_t _sclk=13
-	) : width(_width), height(_height), cs(_cs), dc(_dc), reset(_reset), mosi(_mosi), sclk(_sclk) {
-		init();
-	}
-
-	MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
-	void init() {}
-
-	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
-	void init() {
-		frontBuffer.resize(width * height);
-	}
+	) : cs(_cs), dc(_dc), reset(_reset), mosi(_mosi), sclk(_sclk) {}
 
 	// Color depth for low color mode (2 bytes per pixel)
 	MEMBER_REQUIRES(std::is_same<C, LowColor>::value)
@@ -177,7 +165,7 @@ public:
 
 	  // Set start line - this needs to be 0 for a 128x128 display and 96 for a 128x96 display
 	  sendCommandAndContinue(CMD_START_LINE);
-	  sendDataAndContinue(height == 128 ? 0 : 96);
+	  sendDataAndContinue(H == 128 ? 0 : 96);
 
 	  // Set display offset - this is always zero
 	  sendCommandAndContinue(CMD_DISPLAY_OFFSET);
@@ -229,18 +217,18 @@ public:
 	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
 	void drawPixel(int16_t x, int16_t y, const C &color) {
 		// Single-buffered pixel drawing is trivial: just put the color in the buffer.
-		if((x < 0) || (x >= width) || (y < 0) || (y >= height)) {
+		if((x < 0) || (x >= W) || (y < 0) || (y >= H)) {
 			return;
 		}
 
-		frontBuffer[x + (width * y)] = color;
+		frontBuffer()[x + (W * y)] = color;
 	}
 
 	MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
 	void drawPixel(int16_t x, int16_t y, const C &color) {
 		// Drawing pixels directly to the display requires first setting the correct
 		// video ram position, from x/y to x+1/y+1.
-		if(x < 0 || x >= width || y < 0 || y >= height) {
+		if(x < 0 || x >= W || y < 0 || y >= H) {
 			return;
 		}
 
@@ -263,15 +251,16 @@ public:
 		// to the entire display, and then pushing out every pixel of the buffer.
 		// The display automatically increments its internal pointer to point to the next pixel.
 		SPI.beginTransaction(spi_settings);
-		setVideoRamPosition(0, 0, width-1, height-1);
+		setVideoRamPosition(0, 0, W - 1, H - 1);
 		sendCommandAndContinue(CMD_WRITE_TO_RAM);
 
-		for (int i = 0; i < width * height; i++) {
-			if (i % width) {
-				pushColor(frontBuffer[i]);
+    ArrayType &buffer = frontBuffer();
+		for (int16_t i = 0; i < W * H; i++) {
+			if (i % W) {
+				pushColor(buffer[i]);
 			} else {
 				// Once every row, start a new SPI transaction to give other devices a chance to communicate.
-				pushColor(frontBuffer[i], true);
+				pushColor(buffer[i], true);
 				SPI.endTransaction();
 				SPI.beginTransaction(spi_settings);
 			}
@@ -284,13 +273,13 @@ public:
 		// Instead of drawing each pixel to the screen with the same color, we make
 		// use of the fact that fillRect is optimized to only incur a single overhead
 		// for addressing a cordinate on the display
-		fillRect(0, 0, width, height, color);
+		fillRect(0, 0, W, H, color);
 	}
 
 	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
 	void fillScreen(const C &color) {
 		// just writing to every pixel in the buffer is fast, but std::fill is faster.
-		std::fill(frontBuffer.begin(), frontBuffer.end(), color);
+		std::fill(frontBuffer().begin(), frontBuffer().end(), color);
 	}
 
 	MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
@@ -299,11 +288,11 @@ public:
 		// column of data allows us to write vertical lines super fast.
 		// The x/y position is only set to the start, the display then takes care of
 		// pointing to the next pixel after the first is written.
-		if((x >= width) || (y >= height)) {
+		if((x >= W) || (y >= H)) {
 			return;
 		}
-		if((y + h - 1) >= height) {
-			h = height - y;
+		if((y + h - 1) >= H) {
+			h = H - y;
 		}
 		SPI.beginTransaction(spi_settings);
 		setVideoRamPosition(x, y, x, y + h - 1);
@@ -336,11 +325,11 @@ public:
 
 	void drawFastHLine(int16_t x, int16_t y, int16_t w, const C &color) {
 		// Rudimentary clipping
-		if((x >= width) || (y >= height)) {
+		if((x >= W) || (y >= H)) {
 			return;
 		}
-		if((x + w - 1) >= width) {
-			w = width - x;
+		if((x + w - 1) >= W) {
+			w = W - x;
 		}
 		SPI.beginTransaction(spi_settings);
 		setVideoRamPosition(x, y, x + w - 1, y);
@@ -362,14 +351,14 @@ public:
 
 	void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
 		// rudimentary clipping (drawChar w/big text requires this)
-		if((x >= width) || (y >= height)) {
+		if((x >= W) || (y >= H)) {
 			return;
 		}
-		if((x + w - 1) >= width) {
-			w = width  - x;
+		if((x + w - 1) >= W) {
+			w = W - x;
 		}
-		if((y + h - 1) >= height) {
-			h = height - y;
+		if((y + h - 1) >= H) {
+			h = H - y;
 		}
 
 		SPI.beginTransaction(spi_settings);
@@ -610,8 +599,8 @@ public:
 	  }
 	}
 
-	int16_t getWidth(void)  { return width; }
-	int16_t getHeight(void) { return height; }
+	static int16_t getWidth(void)  { return W; }
+	static int16_t getHeight(void) { return H; }
 
 	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
 	void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, const C &color) {
@@ -738,12 +727,15 @@ public:
 		}
 	}
 
-protected:
-	// Display data
-	const uint8_t width;
-	const uint8_t height;
-	std::vector<C> backBuffer;
-	std::vector<C> frontBuffer;
+private:
+	typedef std::array<C, W * H> ArrayType;
+
+	MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)
+	__attribute__((always_inline)) ArrayType& frontBuffer() {
+			static ArrayType buffer;
+			return buffer;
+	}
+
 	// Pins
 	uint8_t cs;
 	uint8_t dc;
