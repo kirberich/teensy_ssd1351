@@ -220,12 +220,12 @@ public:
 	void pushColor(const C &color, bool lastCommand=false) {
 		// Send color in high color mode - the data gets sent as three bytes,
 		// only using the low 6 bits for the color (for 18bit color in total)
-		sendDataAndContinue(color.r >> 2);
-		sendDataAndContinue(color.g >> 2);
+		sendDataAndContinue(color.r & color.a);
+		sendDataAndContinue(color.g & color.a);
 		if (lastCommand) {
-			sendLastData(color.b >> 2);
+			sendLastData(color.b & color.a);
 		} else {
-			sendDataAndContinue(color.b >> 2);
+			sendDataAndContinue(color.b & color.a);
 		}
 	};
 
@@ -236,7 +236,8 @@ public:
 			return;
 		}
 
-		frontBuffer()[x + (W * y)] = color;
+		ArrayType &buffer = frontBuffer();
+		buffer[x + (W * y)] += color;
 	}
 
 	MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
@@ -412,7 +413,7 @@ public:
 		ArrayType &buffer = frontBuffer();
 		for(int _y = y; _y < (y + h); _y++) {
 			for(int _x = x; _x < (x + w); _x++) {
-				buffer[_x + (W * _y)] = color;
+				drawPixel(_x, _y, color);
 			}
 		}
 	}

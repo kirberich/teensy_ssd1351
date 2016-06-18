@@ -3,16 +3,49 @@
 
 namespace ssd1351 {
 
+	// r = new Color();
+	// r.A = 1 - (1 - fg.A) * (1 - bg.A);
+	// if (r.A < 1.0e-6) return r; // Fully transparent -- R,G,B not important
+	// r.R = fg.R * fg.A / r.A + bg.R * bg.A * (1 - fg.A) / r.A;
+	// r.G = fg.G * fg.A / r.A + bg.G * bg.A * (1 - fg.A) / r.A;
+	// r.B = fg.B * fg.A / r.A + bg.B * bg.A * (1 - fg.A) / r.A;
+
 typedef uint8_t IndexedColor;
 typedef	uint16_t LowColor;
 struct HighColor {
-	uint8_t r : 6 = 0;
-	uint8_t g : 6 = 0;
-	uint8_t b : 6 = 0;
-	uint8_t a : 6 = 63;
+	uint8_t r : 6;
+	uint8_t g : 6;
+	uint8_t b : 6;
+	uint8_t a : 6;
 
-	HighColor() {}
-	HighColor(int16_t _r, int16_t _g, int16_t _b, int16_t _a = 63) : r(_r), g(_g), b(_b), a(_a) {}
+	HighColor() : a(63) {}
+	HighColor(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a = 63) : r(_r), g(_g), b(_b), a(_a) {}
+
+	HighColor& operator+=(const HighColor& rhs) {
+		if (rhs.a == 63) {
+			r = rhs.r;
+			g = rhs.g;
+			b = rhs.b;
+			a = rhs.a;
+			return *this;
+		}
+		uint16_t newAlpha = 63 - ((63 - a) * (63 - rhs.a) >> 6);
+
+		// uint8_t inverseAlpha = 63 - rhs.a;
+
+		// r = (r & inverseAlpha) + (rhs.r & rhs.a);
+		// g = (g & inverseAlpha) + (rhs.g & rhs.a);
+		// b = (b & inverseAlpha) + (rhs.b & rhs.a);
+		// a = 63;
+
+		r = (rhs.r * rhs.a) / newAlpha + (r * a) * (63 - rhs.a) / newAlpha;
+		g = (rhs.g * rhs.a) / newAlpha + (g * a) * (63 - rhs.a) / newAlpha;
+		b = (rhs.b * rhs.a) / newAlpha + (b * a) * (63 - rhs.a) / newAlpha;
+		a = newAlpha;
+
+
+		return *this;
+	}
 };
 
 struct RGB {
@@ -25,8 +58,6 @@ struct RGB {
 		val = val > 255 ? 255 : val;
 		return val < 0 ? 0 : val;
 	}
-
-	RGB() {}
 
 	RGB(const LowColor encoded) {
 		r = (encoded & 0xf800) >> 8;
