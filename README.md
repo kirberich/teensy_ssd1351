@@ -15,11 +15,11 @@ On a non-overclocked teensy, using a 128x96 display and single buffering, it sho
 
 **Some example benchmarks:**
 
- - HighColor single buffered:
+ - HighColor *(262k colours, 6 bits per channel, needs 3 bytes to transmit)* single buffered:
    - ~24ms to update the screen, doesn't change depending on what pixels changed (-> 41fps when no changes to content)
    - ~4ms to write to each pixel in the buffer (-> 35fps when updating every pixel)
    - ~2ms to fill buffer with a solid color (-> 38fps for solid color fill)
- - LowColor single buffered:
+ - LowColor *(64k colours, 5/6/5 bits per channel, needs 2 bytes to transmit)* single buffered:
    - ~13ms to update the screen (-> 77fps)
    - ~3ms to write to each pixel in the buffer (-> 62.5fps)
    - ~1ms to fill buffer with a solid color (-> 71fps)
