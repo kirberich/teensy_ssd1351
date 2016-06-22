@@ -18,6 +18,7 @@ MIT license, all text above must be included in any redistribution
 #pragma once
 #include <Arduino.h>
 #include <array>
+#include <string>
 #include <SPI.h>
 #include "color.h"
 #include "buffer.h"
@@ -46,7 +47,7 @@ template <typename T> void __attribute__((always_inline)) swap(T &a, T &b) {
 namespace ssd1351 {
 // Teensy 3.1 can only generate 30 MHz SPI when running at 120 MHz (overclock)
 // At all other speeds, SPI.beginTransaction() will use the fastest available clock
-#define SPICLOCK 30000000
+#define SPICLOCK 20000000
 
 #define CMD_COMMAND_LOCK 0xFD
 // These two bytes are used to issue some display lock commands for the init. I don't know what they do, but they seem necessary.
@@ -447,7 +448,7 @@ public:
 	    font = (GFXfont *)new_font;
 	}
 
-	uint16_t getTextWidth(char *str) {
+	uint16_t getTextWidth(const char *str) {
 		// Returns width for a given string, using the current font.
 		if(!font) {
 			return 0;
@@ -458,25 +459,24 @@ public:
 		uint8_t first = font->first;
 		uint8_t last = font->last;
 		uint16_t total_width = 0;
-		uint8_t glyph_xadvance = 0;
-		uint8_t glyph_width = 0;
+		uint8_t string_length = strlen(str);
 
-		while((c = *str++)) {
-			if((c == '\n') || (c == '\r') || (c < first) || (c > last)) {
+		for (uint8_t i=0; i<string_length; i++) {
+			c = str[i];
+			if((c == '\n') || (c == '\r') || (c < font->first) || (c > font->last)) {
 				continue;
 			}
 
 			c -= first;
 			glyph = &(font->glyph[c]);
-			glyph_xadvance = glyph->xAdvance;
-			glyph_width = glyph->width + glyph->xOffset;
-			if (glyph_xadvance > glyph_width) {
-				total_width += text_size * glyph_xadvance;
+			if (i == 0) {
+				total_width += text_size * glyph->xAdvance;
+			} else if (i == string_length - 1) {
+				total_width += text_size * (glyph->xOffset + glyph->width);
 			} else {
-				total_width += text_size * glyph_width;
+				total_width += text_size * (glyph->xAdvance + glyph->xOffset);
 			}
 		}
-
 		return total_width;
 	}
 
