@@ -21,6 +21,8 @@ MIT license, all text above must be included in any redistribution
 #include <SPI.h>
 #include "color.h"
 #include "buffer.h"
+#include "gfxfont.h"
+#include "Fonts/TomThumb.h"
 
 extern "C" {
 	int _getpid(){ return -1;}
@@ -72,7 +74,7 @@ const auto black = RGB();
 static const SPISettings spi_settings(SPICLOCK, MSBFIRST, SPI_MODE0);
 
 template <typename C, typename B, int W = 128, int H = 128>
-class SSD1351 {
+class SSD1351 : public Print {
 public:
 	SSD1351(
 		uint8_t _cs = 10,
@@ -404,6 +406,157 @@ public:
 	static int16_t getWidth(void)  { return W; }
 	static int16_t getHeight(void) { return H; }
 
+	// Text methods
+	void setCursor(int16_t x, int16_t y) {
+		cursor_x = x;
+		cursor_y = y;
+	}
+
+	// get current cursor position (get rotation safe maximum values, using: width() for x, height() for y)
+	int16_t getCursorX() const {
+		return cursor_x;
+	}
+
+	int16_t getCursorY() const {
+		return cursor_y;
+	}
+
+	void setTextColor(C color) {
+		// Setting just a text color implies a transparent background, which is implied
+		// by using the same color for background and foreground.
+		text_color = text_bg_color = color;
+	}
+	void setTextColor(const C &foreground, const C &background) {
+		text_color = foreground;
+		text_bg_color = background;
+	}
+
+	void setTextSize(uint8_t new_size) {
+		text_size = (new_size > 0) ? new_size : 1;
+	}
+
+	void setTextWrap(boolean _wrap) {
+		wrap = _wrap;
+	}
+
+	void cp437(bool use_cp437 = true) {
+		cp437 = use_cp437;
+	}
+
+	void setFont(const GFXfont *new_font) {
+	    font = (GFXfont *)new_font;
+	}
+
+	uint16_t getTextWidth(char *str) {
+		// Returns width for a given string, using the current font.
+		if(!font) {
+			return 0;
+		}
+
+		uint8_t c; // Current character
+		GFXglyph *glyph;
+		uint8_t first = font->first;
+		uint8_t last = font->last;
+		uint16_t total_width = 0;
+		uint8_t glyph_xadvance = 0;
+		uint8_t glyph_width = 0;
+
+		while((c = *str++)) {
+			if((c == '\n') || (c == '\r') || (c < first) || (c > last)) {
+				continue;
+			}
+
+			c -= first;
+			glyph = &(font->glyph[c]);
+			glyph_xadvance = glyph->xAdvance;
+			glyph_width = glyph->width + glyph->xOffset;
+			if (glyph_xadvance > glyph_width) {
+				total_width += text_size * glyph_xadvance;
+			} else {
+				total_width += text_size * glyph_width;
+			}
+		}
+
+		return total_width;
+	}
+
+	size_t write(uint8_t c) {
+		if(!font) {
+			return 1;
+		}
+
+		if(c == '\n') {
+			cursor_x = 0;
+			cursor_y += (int16_t)text_size * (uint8_t)font->yAdvance;
+		} else if(c != '\r') {
+			uint8_t first = font->first;
+			if((c >= first) && (c <= font->last)) {
+				uint8_t c2 = c - font->first;
+				GFXglyph *glyph = &(font->glyph[c2]);
+				uint8_t w = glyph->width;
+				uint8_t h = glyph->height;
+				if((w > 0) && (h > 0)) { // Is there an associated bitmap?
+					int16_t xo = glyph->xOffset; // sic
+					if(wrap && ((cursor_x + text_size * (xo + w)) >= W)) {
+						// Drawing character would go off right edge; wrap to new line
+						cursor_x = 0;
+						cursor_y += (int16_t)text_size * font->yAdvance;
+					}
+					drawChar(cursor_x, cursor_y, c, text_color, text_bg_color, text_size);
+				}
+				cursor_x += glyph->xAdvance * (int16_t)text_size;
+			}
+		}
+
+		return 1;
+	}
+
+	void drawChar(int16_t x, int16_t y, unsigned char c, C color, C bg, uint8_t size) {
+		if (!font) {
+			return;
+		}
+		// Character is assumed previously filtered by write() to eliminate
+		// newlines, returns, non-printable characters, etc.  Calling drawChar()
+		// directly with 'bad' characters of font may cause mayhem!
+
+		c -= font->first;
+		GFXglyph *glyph = &(font->glyph[c]);
+		uint8_t *bitmap = font->bitmap;
+
+		uint16_t bo = glyph->bitmapOffset;
+		uint8_t w = glyph->width;
+		uint8_t h = glyph->height;
+		int8_t xo = glyph->xOffset;
+		int8_t yo = glyph->yOffset;
+		uint8_t xx = 0;
+		uint8_t yy = 0;
+		uint8_t bits = 0;
+		uint8_t bit = 0;
+		int16_t xo16 = 0;
+		int16_t yo16 = 0;
+
+		if(size > 1) {
+			xo16 = xo;
+			yo16 = yo;
+		}
+
+		for(yy=0; yy<h; yy++) {
+			for(xx=0; xx<w; xx++) {
+				if(!(bit++ & 7)) {
+					bits = bitmap[bo++];
+				}
+				if(bits & 0x80) {
+					if(size == 1) {
+						drawPixel(x+xo+xx, y+yo+yy, color);
+					} else {
+						fillRect(x+(xo16+xx)*size, y+(yo16+yy)*size, size, size, color);
+					}
+				}
+				bits <<= 1;
+			}
+		}
+	}
+
 	// Yeah, this is somewhere between silly and crazy.
 	// Suggestions on how to include the implementations that work without getting rid of MEMBER_REQUIRES are more than welcome.
 	#include "ssd1351_highcolor.inl"
@@ -431,6 +584,15 @@ private:
 
 	// Magical registers (I think?) to make toggling DC pin super fast.
 	uint8_t pcs_data, pcs_command;
+
+	int16_t cursor_x;
+	int16_t cursor_y;
+	C text_color = black;
+	C text_bg_color = black;
+	uint8_t text_size = 1;
+	bool wrap = true;   // If set, 'wrap' text at right edge of display
+	bool _cp437 = false; // If set, use correct CP437 charset (default is off)
+	GFXfont *font = (GFXfont *)&TomThumb;
 
 	void __attribute__((always_inline)) setVideoRamPosition(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 		// Sets the active video RAM area of the display. After sending this command
