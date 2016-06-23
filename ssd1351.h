@@ -457,8 +457,8 @@ public:
 		cp437 = use_cp437;
 	}
 
-	void setFont(const GFXfont *new_font) {
-	    font = (GFXfont *)new_font;
+	void setFont(const GFXfont &new_font) {
+	    font = (GFXfont *)&new_font;
 	}
 
 	void drawText(const char *str, int16_t x, int16_t y, uint8_t align=ALIGN_LEFT) {
