@@ -28,7 +28,7 @@ void loop() {
   display.fillScreen(ssd1351::RGB());
 
   if (millis() > 5000) {
-	  display.setFont(&FreeMonoBold24pt7b);
+	  display.setFont(FreeMonoBold24pt7b);
 	  display.setTextSize(1);
   }
 
