@@ -67,12 +67,24 @@ namespace ssd1351 {
 #define CMD_WRITE_TO_RAM 0x5C // Start writing to the video ram. After this, color data can be sent.
 #define CMD_NOOP 0xAD // Sometimes used as a last command - doesn't do anything.
 
+// Text alignments
+static const uint8_t ALIGN_LEFT = 0;
+static const uint8_t ALIGN_CENTER = 1;
+static const uint8_t ALIGN_RIGHT = 2;
+
 static const uint8_t HIGH_COLOR = 0;
 static const uint8_t LOW_COLOR = 1;
 
 const auto black = RGB();
 
 static const SPISettings spi_settings(SPICLOCK, MSBFIRST, SPI_MODE0);
+
+struct Rect {
+	int16_t x;
+	int16_t y;
+	int16_t w;
+	int16_t h;
+};
 
 template <typename C, typename B, int W = 128, int H = 128>
 class SSD1351 : public Print {
@@ -410,6 +422,7 @@ public:
 	// Text methods
 	void setCursor(int16_t x, int16_t y) {
 		cursor_x = x;
+		line_start_x = x;
 		cursor_y = y;
 	}
 
@@ -448,36 +461,103 @@ public:
 	    font = (GFXfont *)new_font;
 	}
 
-	uint16_t getTextWidth(const char *str) {
-		// Returns width for a given string, using the current font.
-		if(!font) {
-			return 0;
-		}
+	void drawText(const char *str, int16_t x, int16_t y, uint8_t align=ALIGN_LEFT) {
+		uint8_t string_length = strlen(str);
 
+		Rect bounds = getTextBounds(str, x, y);
+
+		// Store previous settings for cursor and wrapping
+		uint8_t prev_cursor_x = cursor_x;
+		uint8_t prev_cursor_y = cursor_y;
+		bool prevWrap = wrap;
+
+
+		// Set cursor and disable wrapping
+		switch(align) {
+			case ALIGN_LEFT:
+				cursor_x = x;
+				break;
+			case ALIGN_CENTER:
+				cursor_x = x - bounds.w / 2 - (bounds.x - x);
+				break;
+			case ALIGN_RIGHT:
+				cursor_x = x - bounds.w;
+				break;
+		}
+		cursor_y = y;
+		wrap = false;
+
+		print(str);
+
+		// Restore previous cursor and wrap setting
+		cursor_x = prev_cursor_x;
+		cursor_y = prev_cursor_y;
+		wrap = prevWrap;
+	}
+
+	uint16_t getTextWidth(const char *str) {
+		return getTextBounds(str, 0, 0).w;
+	}
+
+	// Pass string and a cursor position, returns UL corner and W,H.
+	Rect getTextBounds(const char *str, int16_t x, int16_t y) {
 		uint8_t c; // Current character
 		GFXglyph *glyph;
 		uint8_t first = font->first;
-		uint8_t last = font->last;
-		uint16_t total_width = 0;
-		uint8_t string_length = strlen(str);
+		uint8_t last  = font->last;
+		int16_t min_x = W;
+		int16_t min_y = H;
+		int16_t max_x = -1;
+		int16_t max_y = -1;
 
-		for (uint8_t i=0; i<string_length; i++) {
-			c = str[i];
-			if((c == '\n') || (c == '\r') || (c < font->first) || (c > font->last)) {
-				continue;
-			}
+		// Bounding box coordinates for the current glyph
+		int16_t glyph_x1 = 0;
+		int16_t glyph_y1 = 0;
+		int16_t glyph_x2 = 0;
+		int16_t glyph_y2 = 0;
 
-			c -= first;
-			glyph = &(font->glyph[c]);
-			if (i == 0) {
-				total_width += text_size * glyph->xAdvance;
-			} else if (i == string_length - 1) {
-				total_width += text_size * (glyph->xOffset + glyph->width);
-			} else {
-				total_width += text_size * (glyph->xAdvance + glyph->xOffset);
+		while((c = *str++)) {
+			if(c != '\n') { // Not a newline
+				if((c == '\r') || (c < font->first) || (c > font->last)) {
+					// Char not present in current font
+					continue;
+				}
+
+				c -= font->first;
+				glyph = &(font->glyph[c]);
+
+				if(wrap && (x + (glyph->xOffset + glyph->width) * text_size >= W)) {
+					// Line wrap
+					x  = line_start_x;  // Reset x to 0
+					y += font->yAdvance; // Advance y by 1 line
+				}
+				glyph_x1 = x + glyph->xOffset * text_size;
+				glyph_y1 = y + glyph->yOffset * text_size;
+				glyph_x2 = glyph_x1 + glyph->width * text_size - 1;
+				glyph_y2 = glyph_y1 + glyph->height * text_size - 1;
+				if(glyph_x1 < min_x) {
+					min_x = glyph_x1;
+				}
+				if(glyph_y1 < min_y) {
+					min_y = glyph_y1;
+				}
+				if(glyph_x2 > max_x) {
+					max_x = glyph_x2;
+				}
+				if(glyph_y2 > max_y) {
+					max_y = glyph_y2;
+				}
+
+				if ((font != &TomThumb) || *(str + 1)) {
+					x += glyph->xAdvance * text_size;
+				}
+			} else { // Newline
+				x  = line_start_x;  // Reset x
+				y += font->yAdvance; // Advance y by 1 line
 			}
 		}
-		return total_width;
+
+		return {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
 	}
 
 	size_t write(uint8_t c) {
@@ -486,7 +566,7 @@ public:
 		}
 
 		if(c == '\n') {
-			cursor_x = 0;
+			cursor_x = line_start_x;
 			cursor_y += (int16_t)text_size * (uint8_t)font->yAdvance;
 		} else if(c != '\r') {
 			uint8_t first = font->first;
@@ -499,7 +579,7 @@ public:
 					int16_t xo = glyph->xOffset; // sic
 					if(wrap && ((cursor_x + text_size * (xo + w)) >= W)) {
 						// Drawing character would go off right edge; wrap to new line
-						cursor_x = 0;
+						cursor_x = line_start_x;
 						cursor_y += (int16_t)text_size * font->yAdvance;
 					}
 					drawChar(cursor_x, cursor_y, c, text_color, text_bg_color, text_size);
@@ -587,6 +667,7 @@ private:
 
 	int16_t cursor_x;
 	int16_t cursor_y;
+	int16_t line_start_x;
 	C text_color = black;
 	C text_bg_color = black;
 	uint8_t text_size = 1;
