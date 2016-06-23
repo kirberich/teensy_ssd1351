@@ -23,7 +23,7 @@ MIT license, all text above must be included in any redistribution
 #include "color.h"
 #include "buffer.h"
 #include "gfxfont.h"
-#include "Fonts/TomThumb.h"
+#include "Fonts/all_fonts.h"
 
 extern "C" {
 	int _getpid(){ return -1;}
