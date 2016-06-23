@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <ssd1351.h>
-#include <Fonts/FreeMonoBold24pt7b.h>
 
 // use this to do Color c = RGB(...) instead of `RGB c = RGB(...)` or ssd1351::LowColor c = RGB(...)
 // because it's slightly faster and guarantees you won't be sending wrong colours to the display.
