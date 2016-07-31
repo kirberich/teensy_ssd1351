@@ -47,7 +47,7 @@ template <typename T> void __attribute__((always_inline)) swap(T &a, T &b) {
 namespace ssd1351 {
 // Teensy 3.1 can only generate 30 MHz SPI when running at 120 MHz (overclock)
 // At all other speeds, SPI.beginTransaction() will use the fastest available clock
-#define SPICLOCK 20000000
+#define SPICLOCK 18000000
 
 #define CMD_COMMAND_LOCK 0xFD
 // These two bytes are used to issue some display lock commands for the init. I don't know what they do, but they seem necessary.
