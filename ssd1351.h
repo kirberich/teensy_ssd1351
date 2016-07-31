@@ -47,9 +47,14 @@ template <typename T> void __attribute__((always_inline)) swap(T &a, T &b) {
 namespace ssd1351 {
 
 // Use 18mhz SPI as that seems about the fastest my version of the display can deal with. For some reason this still breaks
-// when overclocking the teensy, in which case you can reduce this to 15mhz. Note that that significantly reduces the write
-// speed for the display - you might be better off with a slower teensy depending on your application.
+// when overclocking the teensy, insights into this would be highly appreciated.
+// To work around it, you can define SLOW_SPI before including this, in which case the SPI speed is reduced to 15MHz.
+// This slows down the display communication quite a lot - but at least it allows running this on an overclocked teensy.
+#ifdef SLOW_SPI
+#define SPICLOCK 15000000
+#else
 #define SPICLOCK 18000000
+#endif
 
 #define CMD_COMMAND_LOCK 0xFD
 // These two bytes are used to issue some display lock commands for the init. I don't know what they do, but they seem necessary.

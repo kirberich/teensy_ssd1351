@@ -44,6 +44,10 @@ These are the pins I use (which are also the defaults for the constructors)
  - CS 10
  - RESET 14
 
+**Overclocking**
+ - Depending on your circumstances, everything might work fine at 96MHz. But if your display is like mine, it won't do anything at all.
+ - If you find the display doesn't work at 96MHz, simple add `#define SLOW_SPI` before including the library. Note that this will slow down the display communication quite a lot, you might find a non-overclocked teensy is faster unless your application is very CPU-heavy.
+
 **Notes**
 
  - readPixel and readRect aren't implemented yet. The display also doesn't support reading data over SPI, so this only works in buffered mode. It'll be super fast thanks to that though.
