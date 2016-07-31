@@ -137,7 +137,7 @@ public:
 			delay(150);
 		}
 
-		SPI.beginTransaction(SPISettings(SPICLOCK, MSBFIRST, SPI_MODE0));
+		SPI.beginTransaction(spi_settings);
 
 		// Set display command lock settings - they have something to do with when the display can receive which commands,
 		// but I don't exactly understand what the implications are.
