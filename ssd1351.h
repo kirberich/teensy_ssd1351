@@ -130,12 +130,13 @@ public:
 		if (reset < 255) {
 			pinMode(reset, OUTPUT);
 			digitalWrite(reset, HIGH);
-			delay(5);
+			delay(10);
 			digitalWrite(reset, LOW);
-			delay(20);
+			delay(10);
 			digitalWrite(reset, HIGH);
-			delay(150);
+			delay(10);
 		}
+		delay(30);
 
 		SPI.beginTransaction(spi_settings);
 
