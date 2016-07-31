@@ -45,8 +45,10 @@ template <typename T> void __attribute__((always_inline)) swap(T &a, T &b) {
 #define MEMBER_REQUIRES(...) template<bool HiddenMemberBool=true, REQUIRES(HiddenMemberBool && (__VA_ARGS__))>
 
 namespace ssd1351 {
-// Teensy 3.1 can only generate 30 MHz SPI when running at 120 MHz (overclock)
-// At all other speeds, SPI.beginTransaction() will use the fastest available clock
+
+// Use 18mhz SPI as that seems about the fastest my version of the display can deal with. For some reason this still breaks
+// when overclocking the teensy, in which case you can reduce this to 15mhz. Note that that significantly reduces the write
+// speed for the display - you might be better off with a slower teensy depending on your application.
 #define SPICLOCK 18000000
 
 #define CMD_COMMAND_LOCK 0xFD
