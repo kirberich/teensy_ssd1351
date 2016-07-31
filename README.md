@@ -51,7 +51,6 @@ These are the pins I use (which are also the defaults for the constructors)
 **Notes**
 
  - readPixel and readRect aren't implemented yet. The display also doesn't support reading data over SPI, so this only works in buffered mode. It'll be super fast thanks to that though.
- - I've removed all of the font magic from the ILI9341_t3 library. I wanted to make this work first, I'm hoping to add text things back in later. Because of the buffering, many of the optimizations done for the fonts aren't really necessary anymore.
 
 **Thanks**
 
