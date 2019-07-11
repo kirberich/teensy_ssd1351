@@ -666,6 +666,22 @@ public:
 			}
 		}
 	}
+    
+    void sendCommand(uint8_t commandByte, const uint8_t *dataBytes, uint8_t numDataBytes) {
+	    beginSPITransaction();
+	    if (numDataBytes) {
+	    	sendCommandAndContinue(commandByte);
+    		for (uint8_t i=0; i<(numDataBytes-1); i++) {
+	  			sendDataAndContinue(*dataBytes++); // Send the data bytes
+    		}
+    		sendLastData(*dataBytes);
+	    } else {
+	    	sendLastCommand(commandByte);
+	    }
+  
+    	endSPITransaction();
+
+    }
 
 	// Yeah, this is somewhere between silly and crazy.
 	// Suggestions on how to include the implementations that work without getting rid of MEMBER_REQUIRES are more than welcome.
