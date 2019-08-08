@@ -16,7 +16,7 @@ void updateScreen() {
 	// Updating the screen in single buffer mode means first setting the video ram
 	// to the entire display, and then pushing out every pixel of the buffer.
 	// The display automatically increments its internal pointer to point to the next pixel.
-	SPI.beginTransaction(spi_settings);
+	beginSPITransaction();
 	setVideoRamPosition(0, 0, W - 1, H - 1);
 	sendCommandAndContinue(CMD_WRITE_TO_RAM);
 
@@ -27,11 +27,11 @@ void updateScreen() {
 		} else {
 			// Once every row, start a new SPI transaction to give other devices a chance to communicate.
 			pushColor(buffer[i], true);
-			SPI.endTransaction();
-			SPI.beginTransaction(spi_settings);
+			endSPITransaction();
+			beginSPITransaction();
 		}
 	}
-	SPI.endTransaction();
+	endSPITransaction();
 }
 
 MEMBER_REQUIRES(std::is_same<B, SingleBuffer>::value)

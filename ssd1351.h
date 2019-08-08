@@ -50,12 +50,14 @@ namespace ssd1351 {
 // when overclocking the teensy, insights into this would be highly appreciated.
 // To work around it, you can define SLOW_SPI before including this, in which case the SPI speed is reduced to 15MHz.
 // This slows down the display communication quite a lot - but at least it allows running this on an overclocked teensy.
+#ifndef SPICLOCK
 #ifdef SLOW_SPI
 #define SPICLOCK 15000000
 #else
 #define SPICLOCK 18000000
 #endif
-
+#endif
+	
 #define CMD_COMMAND_LOCK 0xFD
 // These two bytes are used to issue some display lock commands for the init. I don't know what they do, but they seem necessary.
 #define COMMAND_LOCK_INIT1 0x12 // "Unlock OLED driver IC MCU interface from entering command"
@@ -111,7 +113,7 @@ public:
 		// Only size and color depth are settable - everything else is hardcoded.
 
 		// verify SPI pins are valid;
-		if ((mosi == 11 || mosi == 7) && (sclk == 13 || sclk == 14)) {
+		if (SPI.pinIsMOSI(mosi) && SPI.pinIsSCK(sclk)) {
 			SPI.setMOSI(mosi);
 			SPI.setSCK(sclk);
 		} else {
@@ -121,6 +123,7 @@ public:
 
 		SPI.begin();
 
+#ifdef KINETISK
 		if (SPI.pinIsChipSelect(cs, dc)) {
 			// Configure both cs and dc as chip selects, which allows triggering them extremely fast
 			// pcs_data and pcs_command contain the bitmasks used when setting the pin states.
@@ -132,7 +135,26 @@ public:
 			pcs_command = 0;
 			return;
 		}
+#elif defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x
+		_csport = portOutputRegister(cs);
+		_cspinmask = digitalPinToBitMask(cs);
+		pinMode(cs, OUTPUT);	
+		DIRECT_WRITE_HIGH(_csport, _cspinmask);
+		_spi_tcr_current = IMXRT_LPSPI4_S.TCR; // get the current TCR value 
 
+		// TODO:  Need to setup DC to actually work.
+		if (SPI.pinIsChipSelect(dc)) {
+		 	SPI.setCS(dc);
+		 	_dcport = 0;
+		 	_dcpinmask = 0;
+		} else {
+			_dcport = portOutputRegister(dc);
+			_dcpinmask = digitalPinToBitMask(dc);
+			pinMode(dc, OUTPUT);	
+			DIRECT_WRITE_HIGH(_dcport, _dcpinmask);
+		}
+		maybeUpdateTCR(LPSPI_TCR_PCS(1) | LPSPI_TCR_FRAMESZ(7));
+#endif
 		// toggle reset low to reset
 		if (reset < 255) {
 			pinMode(reset, OUTPUT);
@@ -145,7 +167,7 @@ public:
 		}
 		delay(30);
 
-		SPI.beginTransaction(spi_settings);
+		beginSPITransaction();
 
 		// Set display command lock settings - they have something to do with when the display can receive which commands,
 		// but I don't exactly understand what the implications are.
@@ -188,13 +210,13 @@ public:
 		sendCommandAndContinue(CMD_NORMAL_MODE);
 		sendLastCommand(CMD_DISPLAY_WAKE);
 
-		SPI.endTransaction();
+		endSPITransaction();
 	}
 
 	void sleep(bool enable) {
-		SPI.beginTransaction(spi_settings);
+		beginSPITransaction();
 		sendLastCommand(enable ? CMD_DISPLAY_SLEEP : CMD_DISPLAY_WAKE);
-		SPI.endTransaction();
+		endSPITransaction();
 	}
 
 	void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
@@ -644,6 +666,22 @@ public:
 			}
 		}
 	}
+    
+    void sendCommand(uint8_t commandByte, const uint8_t *dataBytes, uint8_t numDataBytes) {
+	    beginSPITransaction();
+	    if (numDataBytes) {
+	    	sendCommandAndContinue(commandByte);
+    		for (uint8_t i=0; i<(numDataBytes-1); i++) {
+	  			sendDataAndContinue(*dataBytes++); // Send the data bytes
+    		}
+    		sendLastData(*dataBytes);
+	    } else {
+	    	sendLastCommand(commandByte);
+	    }
+  
+    	endSPITransaction();
+
+    }
 
 	// Yeah, this is somewhere between silly and crazy.
 	// Suggestions on how to include the implementations that work without getting rid of MEMBER_REQUIRES are more than welcome.
@@ -682,7 +720,7 @@ private:
 	bool wrap = true;   // If set, 'wrap' text at right edge of display
 	bool _cp437 = false; // If set, use correct CP437 charset (default is off)
 	GFXfont *font = (GFXfont *)&TomThumb;
-
+	// Teensy 3.x processors
 	void __attribute__((always_inline)) setVideoRamPosition(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 		// Sets the active video RAM area of the display. After sending this command
 		// (and sending the 'write to ram' command), color data can be sent do the display without
@@ -701,6 +739,13 @@ private:
 	// ****
 	// Low-level data pushing functions
 	// ****
+#ifdef KINETISK
+	void beginSPITransaction() __attribute__((always_inline)) {
+		SPI.beginTransaction(spi_settings);
+	}
+	void endSPITransaction() __attribute__((always_inline)) {
+		SPI.endTransaction();
+	}
 	void __attribute__((always_inline)) waitFifoNotFull() {
 		uint32_t sr;
 		uint32_t tmp __attribute__((unused));
@@ -752,6 +797,113 @@ private:
 		KINETISK_SPI0.PUSHR = data | (pcs_data << 16) | SPI_PUSHR_CTAS(1) | SPI_PUSHR_EOQ;
 		waitTransmitComplete(mcr);
 	}
+#elif defined(__IMXRT1052__) || defined(__IMXRT1062__)  // Teensy 4.x
+    uint32_t _cspinmask;
+    volatile uint32_t *_csport;
+    uint32_t _spi_tcr_current;
+    uint32_t _dcpinmask;
+    uint8_t _pending_rx_count = 0;
+    volatile uint32_t *_dcport;
+
+	void __attribute__((always_inline)) DIRECT_WRITE_LOW(volatile uint32_t * base, uint32_t mask)  __attribute__((always_inline)) {
+		*(base+34) = mask;
+	}
+	void __attribute__((always_inline)) DIRECT_WRITE_HIGH(volatile uint32_t * base, uint32_t mask)  __attribute__((always_inline)) {
+		*(base+33) = mask;
+	}
+	void __attribute__((always_inline)) waitFifoNotFull() {
+    	uint32_t tmp __attribute__((unused));
+    	do {
+        	if ((IMXRT_LPSPI4_S.RSR & LPSPI_RSR_RXEMPTY) == 0)  {
+            	tmp = IMXRT_LPSPI4_S.RDR;  // Read any pending RX bytes in
+            	if (_pending_rx_count) _pending_rx_count--; //decrement count of bytes still levt
+        	}
+    	} while ((IMXRT_LPSPI4_S.SR & LPSPI_SR_TDF) == 0) ;
+	}
+
+	void __attribute__((always_inline)) waitTransmitComplete() {
+	    uint32_t tmp __attribute__((unused));
+	    while (_pending_rx_count) {
+	        if ((IMXRT_LPSPI4_S.RSR & LPSPI_RSR_RXEMPTY) == 0)  {
+	            tmp = IMXRT_LPSPI4_S.RDR;  // Read any pending RX bytes in
+	            _pending_rx_count--; //decrement count of bytes still levt
+	        }
+	    }
+	    IMXRT_LPSPI4_S.CR = LPSPI_CR_MEN | LPSPI_CR_RRF;       // Clear RX FIFO
+	}
+	void __attribute__((always_inline)) waitTransmitComplete(uint32_t mcr) {
+	    waitTransmitComplete();
+	}
+	#define TCR_MASK  (LPSPI_TCR_PCS(3) | LPSPI_TCR_FRAMESZ(31) | LPSPI_TCR_CONT | LPSPI_TCR_RXMSK )
+	void maybeUpdateTCR(uint32_t requested_tcr_state) /*__attribute__((always_inline)) */ {
+		if ((_spi_tcr_current & TCR_MASK) != requested_tcr_state) {
+			bool dc_state_change = (_spi_tcr_current & LPSPI_TCR_PCS(3)) != (requested_tcr_state & LPSPI_TCR_PCS(3));
+			_spi_tcr_current = (_spi_tcr_current & ~TCR_MASK) | requested_tcr_state ;
+			// only output when Transfer queue is empty.
+			if (!dc_state_change || !_dcpinmask) {
+				while ((IMXRT_LPSPI4_S.FSR & 0x1f) )	;
+				IMXRT_LPSPI4_S.TCR = _spi_tcr_current;	// update the TCR
+
+			} else {
+				waitTransmitComplete();
+				if (requested_tcr_state & LPSPI_TCR_PCS(3)) DIRECT_WRITE_HIGH(_dcport, _dcpinmask);
+				else DIRECT_WRITE_LOW(_dcport, _dcpinmask);
+				IMXRT_LPSPI4_S.TCR = _spi_tcr_current & ~(LPSPI_TCR_PCS(3) | LPSPI_TCR_CONT);	// go ahead and update TCR anyway?  
+
+			}
+		}
+	}
+
+	void beginSPITransaction() __attribute__((always_inline)) {
+		SPI.beginTransaction(spi_settings);
+		if (_csport) {
+			DIRECT_WRITE_LOW(_csport, _cspinmask);
+		}
+	}
+	void endSPITransaction() __attribute__((always_inline)) {
+		if (_csport)
+			DIRECT_WRITE_HIGH(_csport, _cspinmask);
+		SPI.endTransaction();
+	}
+
+	void __attribute__((always_inline)) sendCommandAndContinue(uint8_t command) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(0) | LPSPI_TCR_FRAMESZ(7) /*| LPSPI_TCR_CONT*/);
+		IMXRT_LPSPI4_S.TDR = command;
+		_pending_rx_count++;	//
+		waitFifoNotFull();
+	}
+	void __attribute__((always_inline)) sendLastCommand(uint8_t command) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(0) | LPSPI_TCR_FRAMESZ(7) /*| LPSPI_TCR_CONT*/);
+		IMXRT_LPSPI4_S.TDR = command;
+		_pending_rx_count++;	//
+		waitTransmitComplete();
+	}
+
+	void __attribute__((always_inline)) sendDataAndContinue(uint8_t data) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(1) | LPSPI_TCR_FRAMESZ(7) | LPSPI_TCR_CONT);
+		IMXRT_LPSPI4_S.TDR = data;
+		_pending_rx_count++;	//
+		waitFifoNotFull();
+	}
+	void __attribute__((always_inline)) sendLastData(uint8_t data) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(1) | LPSPI_TCR_FRAMESZ(7));
+		IMXRT_LPSPI4_S.TDR = data;
+		_pending_rx_count++;	//
+		waitTransmitComplete();
+	}
+	void __attribute__((always_inline)) sendDataAndContinue16(uint16_t data) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(1) | LPSPI_TCR_FRAMESZ(15) | LPSPI_TCR_CONT);
+		IMXRT_LPSPI4_S.TDR = data;
+		_pending_rx_count++;	//
+		waitFifoNotFull();
+	}
+	void __attribute__((always_inline)) sendLastData16(uint16_t data) {
+		maybeUpdateTCR(LPSPI_TCR_PCS(1) | LPSPI_TCR_FRAMESZ(15));
+		IMXRT_LPSPI4_S.TDR = data;
+		_pending_rx_count++;	//
+		waitTransmitComplete();
+	}
+#endif
 };
 
 }

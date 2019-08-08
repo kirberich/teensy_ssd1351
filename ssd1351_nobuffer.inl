@@ -9,11 +9,11 @@ void drawPixel(int16_t x, int16_t y, const C &color) {
 		return;
 	}
 
-	SPI.beginTransaction(spi_settings);
+	beginSPITransaction();
 	setVideoRamPosition(x, y, x+1, y+1);
 	sendCommandAndContinue(CMD_WRITE_TO_RAM);
 	pushColor(color, true);
-	SPI.endTransaction();
+	endSPITransaction();
 }
 
 MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
@@ -42,14 +42,14 @@ void drawFastVLine(int16_t x, int16_t y, int16_t h, const C &color) {
 	if((y + h - 1) >= H) {
 		h = H - y;
 	}
-	SPI.beginTransaction(spi_settings);
+	beginSPITransaction();
 	setVideoRamPosition(x, y, x, y + h - 1);
 	sendCommandAndContinue(CMD_WRITE_TO_RAM);
 	while (h-- > 1) {
 		pushColor(color);
 	}
 	pushColor(color, true);
-	SPI.endTransaction();
+	endSPITransaction();
 }
 
 MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
@@ -61,14 +61,14 @@ void drawFastHLine(int16_t x, int16_t y, int16_t w, const C &color) {
 	if((x + w - 1) >= W) {
 		w = W - x;
 	}
-	SPI.beginTransaction(spi_settings);
+	beginSPITransaction();
 	setVideoRamPosition(x, y, x + w - 1, y);
 	sendCommandAndContinue(CMD_WRITE_TO_RAM);
 	while (w-- > 1) {
 		pushColor(color);
 	}
 	pushColor(color, true);
-	SPI.endTransaction();
+	endSPITransaction();
 }
 
 MEMBER_REQUIRES(std::is_same<B, NoBuffer>::value)
@@ -84,7 +84,7 @@ void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
 		h = H - y;
 	}
 
-	SPI.beginTransaction(spi_settings);
+	beginSPITransaction();
 	setVideoRamPosition(x, y, x + w - 1, y + h - 1);
 	sendCommandAndContinue(CMD_WRITE_TO_RAM);
 	for(y = h; y > 0; --y) {
@@ -93,11 +93,11 @@ void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, const C &color) {
 		}
 		pushColor(color, true);
 		// At the end of every row, end the transaction to give other SPI devices a chance to communicate.
-		SPI.endTransaction();
+		endSPITransaction();
 
 		// Start a new transaction, unless this is the last row
 		if (y) {
-			SPI.beginTransaction(spi_settings);
+			beginSPITransaction();
 		}
 	}
 }
